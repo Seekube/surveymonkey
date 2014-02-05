@@ -1,4 +1,4 @@
-PHP class for SurveyMonkey API
+PHP class for SurveyMonkey API.
 ==============================
 
 
