@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "type": "library",
     "description": "PHP class for SurveyMonkey API.",
-    "keywords": [laravel", "php"],
+    "keywords": ["laravel", "php"],
     "homepage": "https://github.com/oori/php-surveymonkey",
     "license": "MIT",
     "authors": [
