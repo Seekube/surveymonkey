@@ -1,72 +1,73 @@
 <?php
+
 /**
  * Class for SurveyMonkey API v2
  * @package default
  */
 class SurveyMonkey {
 
-    /**
-     * @var string API key
-     * @access protected
-     */
+  /**
+   * @var string API key
+   * @access protected
+   */
 	protected $_apiKey;
    
-    /**
-     * @var string API access token
-     * @access protected
-     */
+  /**
+   * @var string API access token
+   * @access protected
+   */
 	protected $_accessToken;
 
-    /**
-     * @var string API protocol
-     * @access protected
-     */
+  /**
+   * @var string API protocol
+   * @access protected
+   */
 	protected $_protocol;
 
-    /**
-     * @var string API hostname
-     * @access protected
-     */
+  /**
+   * @var string API hostname
+   * @access protected
+   */
 	protected $_hostname;
 
-    /**
-     * @var string API resource path
-     * @access protected
-     */
+  /**
+   * @var string API resource path
+   * @access protected
+   */
 	protected $_resource;
 
-    /**
-     * @var string API version
-     * @access protected
-     */
+  /**
+   * @var string API version
+   * @access protected
+   */
 	protected $_version;
 
-    /**
-     * @var resource $conn The client connection instance to use.
-     * @access private
-     */
-    private $conn = null;
+  /**
+   * @var resource $conn The client connection instance to use.
+   * @access private
+   */
+  private $conn = null;
 
-    /**
-     * @var array (optional) cURL connection options
-     * @access protected
-     */
-    protected $_connectionOptions;
+  /**
+   * @var array (optional) cURL connection options
+   * @access protected
+   */
+  protected $_connectionOptions;
 
-    /**
-     * @const SurveyMonkey Status code:  Success
-     */
-    const SM_STATUS_SUCCESS = 0;
+  /**
+   * @const SurveyMonkey Status code:  Success
+   */
+  const SM_STATUS_SUCCESS = 0;
 
-    /**
-     * @const HTTP response code: Success
-     */
-    const HTTP_RESPONSE_CODE_SUCCESS = 200;
+  /**
+   * @const HTTP response code: Success
+   */
+  const HTTP_RESPONSE_CODE_SUCCESS = 200;
 
-    /**
-     * SurveyMonkey API Status code definitions
-     */
-    public static $SM_STATUS_CODES = array(
+  /**
+   * SurveyMonkey API Status code definitions
+   */
+  public static $SM_STATUS_CODES = array(
 		0	=> "Success",
 		1	=> "Not Authenticated",
 		2	=> "Invalid User Credentials",
@@ -99,8 +100,14 @@ class SurveyMonkey {
      */
 	public function __construct($apiKey, $accessToken, $options = array(), $connectionOptions = array()) {
 
-		if (empty($apiKey)) 		throw new SurveyMonkey_Exception('Missing apiKey');
-		if (empty($accessToken)) 	throw new SurveyMonkey_Exception('Missing accessToken');
+		if (empty($apiKey)) {
+      throw new SurveyMonkey_Exception('Missing apiKey');
+    }
+		
+    if (empty($accessToken)) {
+      throw new SurveyMonkey_Exception('Missing accessToken');
+    }
+
 		$this->_apiKey = $apiKey;
 		$this->_accessToken = $accessToken;
 
@@ -118,7 +125,15 @@ class SurveyMonkey {
 	 * @return string Constructed URI
 	 */
 	protected function buildUri($method){
-		return $this->_protocol . '://' . $this->_hostname . '/' . $this->_version . '/' . $this->_resource . '/' . $method . '?api_key=' . $this->_apiKey;
+    if (strcmp($method, "create_flow") == 0 || strcmp($method, "send_flow") == 0) {
+      $this->_resource = "batch";
+    }
+    
+    if (strcmp($method, "create_collector") == 0) {
+      $this->_resource = "collectors"; 
+    }
+		
+    return $this->_protocol . '://' . $this->_hostname . '/' . $this->_version . '/' . $this->_resource . '/' . $method . '?api_key=' . $this->_apiKey;
 	}
 
 	/**
@@ -127,7 +142,8 @@ class SurveyMonkey {
 	 */
 	protected function getConnection(){
 		$this->conn = curl_init();
-		return is_resource($this->conn);
+		
+    return is_resource($this->conn);
 	}
 
 	/**
@@ -149,30 +165,44 @@ class SurveyMonkey {
         }
 
         $request_url = $this->buildUri( $method );
-        curl_setopt($this->conn, CURLOPT_URL, $request_url); 	// URL to post to
-        curl_setopt($this->conn, CURLOPT_RETURNTRANSFER, 1 ); 	// return into a variable
+        curl_setopt($this->conn, CURLOPT_URL, $request_url);  // URL to post to
+        curl_setopt($this->conn, CURLOPT_RETURNTRANSFER, 1 );   // return into a variable
         $headers = array('Content-type: application/json', 'Authorization: Bearer ' . $this->_accessToken);
         curl_setopt($this->conn, CURLOPT_HTTPHEADER, $headers ); // custom headers
-        curl_setopt($this->conn, CURLOPT_HEADER, false ); 		// return into a variable
-        curl_setopt($this->conn, CURLOPT_POST, true);			// POST
+        curl_setopt($this->conn, CURLOPT_HEADER, false );     // return into a variable
+        curl_setopt($this->conn, CURLOPT_POST, true);     // POST
         $postBody = (!empty($params))? json_encode($params) : "{}";
         curl_setopt($this->conn, CURLOPT_POSTFIELDS,  $postBody);
-        curl_setopt_array($this->conn, $this->_connectionOptions);	// (optional) additional options
+        curl_setopt_array($this->conn, $this->_connectionOptions);  // (optional) additional options
 
         $result = curl_exec( $this->conn );
-        if ($result === false) return $this->failure('Curl Error: ' . curl_error($this->conn));
+
+        if ($result === false) {
+          return $this->failure('Curl Error: ' . curl_error($this->conn));
+        }
+        
         $responseCode = curl_getinfo($this->conn, CURLINFO_HTTP_CODE);
-        if ($responseCode != self::HTTP_RESPONSE_CODE_SUCCESS) return $this->failure('Error ['.$responseCode.']: ' . $result);
+        
+        if ($responseCode != self::HTTP_RESPONSE_CODE_SUCCESS) {
+          return $this->failure('Error ['.$responseCode.']: ' . $result);
+        }
 
         $this->closeConnection();
 
         $parsedResult = json_decode($result,true);
         $jsonErr = json_last_error();
-        if ($parsedResult === null  &&  $jsonErr !== JSON_ERROR_NONE) return $this->failure("Error [$jsonErr] parsing result JSON");
+        
+        if ($parsedResult === null  &&  $jsonErr !== JSON_ERROR_NONE) {
+          return $this->failure("Error [$jsonErr] parsing result JSON");
+        }
 
         $status = $parsedResult['status'];
-        if ($status != self::SM_STATUS_SUCCESS) return $this->failure("API Error: Status [$status:" . self::explainStatusCode($status) . '].  Message [' . $parsedResult["errmsg"] . ']');
-        else return $this->success($parsedResult["data"]);
+        
+        if ($status != self::SM_STATUS_SUCCESS) {
+          return $this->failure("API Error: Status [$status:" . self::explainStatusCode($status) . '].  Message [' . $parsedResult["errmsg"] . ']');
+        } else {
+          return $this->success($parsedResult["data"]);
+        }
 	}
 
 
@@ -225,6 +255,7 @@ class SurveyMonkey {
 	 */
 	public function getSurveyDetails($surveyId){
         $params = array ( 'survey_id' => $surveyId );
+        
         return $this->run('get_survey_details', $params);
 	}
 
@@ -237,6 +268,7 @@ class SurveyMonkey {
 	 */
 	public function getCollectorList($surveyId, $params = array()){
         $params['survey_id'] = $surveyId;
+        
         return $this->run('get_collector_list', $params);
 	}
 
@@ -249,6 +281,7 @@ class SurveyMonkey {
 	 */
 	public function getRespondentList($surveyId, $params = array()){
         $params['survey_id'] = $surveyId;
+        
         return $this->run('get_respondent_list', $params);
 	}
 
@@ -265,20 +298,28 @@ class SurveyMonkey {
 		// Split requests to multiple chunks, if larger then $chunkSize
 		if (count($respondentIds) > $chunkSize) {
 			$data = array();
-			foreach (array_chunk($respondentIds, $chunkSize) as $r) {
+			
+      foreach (array_chunk($respondentIds, $chunkSize) as $r) {
 				$result = $this->getResponses($surveyId, $r, $chunkSize);
-				if (!$result["success"]) return $result;
-				$data = array_merge($data, $result["data"]);
+				
+        if (!$result["success"]) {
+          return $result;
+        } 
+				
+        $data = array_merge($data, $result["data"]);
+        
 			}
-			return $this->success($data);
+			
+      return $this->success($data);
 		}
 
 
-        $params = array(
-        	'survey_id' => $surveyId,
-        	'respondent_ids' => $respondentIds
-    	);
-        return $this->run('get_responses', $params);
+    $params = array(
+    	'survey_id' => $surveyId,
+    	'respondent_ids' => $respondentIds
+  	);
+  
+    return $this->run('get_responses', $params);
 	}
 
 	/**
@@ -289,8 +330,84 @@ class SurveyMonkey {
 	 */
 	public function getResponseCount($collectorId){
         $params = array( 'collector_id' => $collectorId );
+    
         return $this->run('get_response_counts', $params);
 	}
+
+	public function getUserDetails(){
+    return $this->run('user/get_user_details');
+  }
+
+  //template methods
+
+  /**
+   * Retrieves a paged list of templates provided by survey monkey.
+   * @see https://developer.surveymonkey.com/mashery/get_template_list
+   * @param array $params optional request array
+   * @return array Results
+   */
+  public function getTemplateList($params = array()){
+    return $this->run('template/get_template_list', $params);
+  }
+
+  //collector methods
+
+  /**
+   * Retrieves a paged list of templates provided by survey monkey.
+   * @see https://developer.surveymonkey.com/mashery/create_collector
+   * @param string $surveyId Survey ID
+   * @param string $collectorName optional Collector Name - defaults to 'New Link'
+   * @param string $collectorType required Collector Type - only 'weblink' currently supported
+   * @param array $params optional request array
+   * @return array Results
+   */
+  public function createCollector($surveyId, $collectorName = null, $collectorType = 'weblink'){
+    $params = array(
+      'survey_id'=>$surveyId,
+      'collector'=>array(
+        'type'=>$collectorType,
+        'name'=>$collectorName
+      )
+    );
+    
+    return $this->run('create_collector', $params);
+  }
+
+  
+  //batch methods
+
+  /**
+   * Create a survey, email collector and email message based on a template or existing survey.
+   * @see https://developer.surveymonkey.com/mashery/create_flow
+   * @param string $surveyTitle Survey Title
+   * @param array $params optional request array
+   * @return array Results
+   */
+  public function createFlow($surveyTitle, $from_survey_id, $params = array()){
+    
+    if (isset($params['survey'])){
+      $params['survey']['survey_title'] = $surveyTitle;
+    } else {
+      $params['survey'] = array(
+        'from_survey_id'=>$from_survey_id,
+        'survey_title'=>$surveyTitle);
+    }
+
+    return $this->run('create_flow', $params);
+  }
+
+  /**
+   * Create an email collector and email message attaching them to an existing survey.
+   * @see https://developer.surveymonkey.com/mashery/send_flow
+   * @param string $surveyId Survey ID
+   * @param array $params optional request array
+   * @return array Results
+   */
+  public function sendFlow($surveyId, $params = array()){
+    $params['survey_id'] = $surveyId;
+    
+    return $this->run('send_flow', $params);
+  }
 }
 
 /**
